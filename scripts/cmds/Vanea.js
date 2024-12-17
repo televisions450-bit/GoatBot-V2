@@ -81,4 +81,4 @@ module.exports = {
       return message.reply("❌ Something went wrong while continuing the chat.");
     }
   },
-}
+};
