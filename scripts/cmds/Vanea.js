@@ -1,17 +1,20 @@
 const axios = require("axios");
 
-async function queryVanea(prompt) {
+async function queryVanea(prompt, sessionId) {
   try {
     const prefixedQuery = `Vanea ${prompt}`;
 
-    const response = await axios.get("https://api-1-h0sg.onrender.com/Vanea?query?=", {
-      params: { query: prefixedQuery },
+    const response = await axios.get("https://api-1-h0sg.onrender.com/Vanea", {
+      params: { 
+        query: prefixedQuery,
+        sessionId // Pass sessionId to API
+      },
       timeout: 10000,
     });
 
     console.log("Full API Response:", response.data);
 
-    return response.data.message || response.data; // Direct response content
+    return response.data.message || response.data; // Return the response content
   } catch (error) {
     if (error.response) {
       console.error("API Error:", error.response.status, error.response.data);
@@ -30,7 +33,7 @@ module.exports = {
   config: {
     name: "vanea",
     aliases: ["chat", "ai"],
-    version: "1.3",
+    version: "1.4",
     author: "Ayanfe",
     longDescription: {
       en: "Interact with Vanea via the provided API and continue chats based on replies.",
@@ -44,6 +47,8 @@ module.exports = {
   // Triggered when someone uses the initial command
   onStart: async function ({ message, args, event, api }) {
     const prompt = args.join(" ").trim();
+    const userId = event.senderID; // Get the user's ID as the session ID
+
     message.reaction("⏳", event.messageID);
 
     if (!prompt) {
@@ -51,12 +56,12 @@ module.exports = {
     }
 
     try {
-      const reply = await queryVanea(prompt);
+      const reply = await queryVanea(prompt, userId); // Pass userId as sessionId
       const sentMessage = await message.reply(reply); // Send reply and store message info
       message.reaction("✅", event.messageID);
 
       // Save message context for onChat
-      this.context = { botMessageID: sentMessage.messageID };
+      this.context = { botMessageID: sentMessage.messageID, userId };
     } catch (error) {
       console.error("Error in command execution:", error.message);
       message.reaction("❌", event.messageID);
@@ -70,7 +75,7 @@ module.exports = {
       // Check if the reply is directed to the bot's last message
       if (event.messageReply && event.messageReply.messageID === this.context?.botMessageID) {
         const prompt = args.join(" ").trim() || "continue"; // Default prompt if none provided
-        const reply = await queryVanea(prompt);
+        const reply = await queryVanea(prompt, this.context.userId); // Use stored userId as sessionId
         const sentMessage = await message.reply(reply);
 
         // Update botMessageID to handle further replies
