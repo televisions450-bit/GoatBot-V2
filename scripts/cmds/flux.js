@@ -1,38 +1,69 @@
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
   config: {
     name: "flux",
-    version: "1.0",
-    author: "Samir Œ",
-    countDown: 5,
-    role: 2,
-    shortDescription: "anime image generator",
-    longDescription: "",
-    category: "𝗔𝗜-𝗚𝗘𝗡𝗘𝗥𝗔𝗧𝗘𝗗",
+    aliases: ["fl"],
+    version: "1.0.0",
+    author: "ayanfe",
+    role: 0,
+    shortDescription: "Generate an image based on a prompt using flux API created by Lance",
+    longDescription: "generate image with flux API created by Lance ",
+    category: "AI",
     guide: {
       en: "{pn} <prompt>"
+    },
+    usages: "/flux <prompt>",
+    cooldowns: 5,
+    dependencies: {
+      "axios": "",
+      "fs": "",
+      "path": ""
     }
   },
+  onStart: async function({ message, api, args, event }) {
+    if (args.length === 0) return message.reply("Please provide a prompt to generate an image.");
 
-  onStart: async function ({ message, args }) {
-    let prompt = args.join(" ");
+    const prompt = args.join(" ");
+    const apiUrl = `http://158.69.118.209:20147/api/flux?prompt=${encodeURIComponent(prompt)}`;
 
     try {
-      const apiUrl = `https://samirxzy.onrender.com/flux?prompt=${encodeURIComponent(prompt)}`;
-      const response = await axios.get(apiUrl, { responseType: 'stream' });
+      const response = await axios.get(apiUrl);
 
-      if (!response.data) {
-        return message.reply("Failed to retrieve image.");
+      if (!response.data || !response.data.imageUrl) {
+        return message.reply("Failed to generate image, please try again.");
       }
 
-      return message.reply({
-        body: '',
-        attachment: response.data
+      const imageUrl = response.data.imageUrl;
+      const imagePath = path.resolve(__dirname, 'cache', `${Date.now()}.jpg`);
+
+      const writer = fs.createWriteStream(imagePath);
+      const imageResponse = await axios({
+        url: imageUrl,
+        method: 'GET',
+        responseType: 'stream'
       });
+
+      imageResponse.data.pipe(writer);
+
+      writer.on('finish', () => {
+        message.reply({
+          body: `Here is the generated image for your prompt: "${prompt}"`,
+          attachment: fs.createReadStream(imagePath)
+        }, () => {
+          fs.unlinkSync(imagePath);
+        });
+      });
+
+      writer.on('error', (err) => {
+        message.reply("Error downloading the image.");
+      });
+
     } catch (error) {
-      console.error(error);
-      return message.reply("Failed to retrieve image.");
+      console.error("Error:", error);
+      message.reply("An error occurred while processing your request.");
     }
   }
 };
